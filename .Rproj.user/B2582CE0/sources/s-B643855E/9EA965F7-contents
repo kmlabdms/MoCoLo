@@ -1,0 +1,28 @@
+#liftover
+library(readr)
+library(tidyverse)
+MCF10A.0 <- read_delim("data/GSE100234_DIP_8oxodG_peaks_MCF10A.bed", 
+                       "\t", escape_double = FALSE, trim_ws = TRUE)
+MCF10A <- MCF10A.0%>%filter(`-log10(pvalue)`>5, fold_enrichment>7)
+
+# install.packages("BiocManager")
+BiocManager::install("plyranges")
+library(GenomicRanges)
+toGR <-function(i){
+  GRanges(seqnames = i$chr,
+          ranges = IRanges(start = i$start,
+                           end = i$end))}
+
+library(liftOver)
+ch <- import.chain('data/hg18ToHg19.over.chain')
+(MCF10A.hg19 <- liftOver(toGR(MCF10A), ch)%>%as_tibble()%>%
+  dplyr::select(seqnames,start,end))
+
+
+ch18.38 <- import.chain('data/hg18ToHg38.over.chain')
+(MCF10A.hg38 <- liftOver(toGR(MCF10A), ch)%>%as_tibble()%>%
+    dplyr::select(seqnames,start,end))
+
+ch19.38 <- import.chain('data/hg19ToHg38.over.chain')
+(MCF10A.hg38 <- liftOver(toGR(MCF10A), ch)%>%as_tibble()%>%
+    dplyr::select(seqnames,start,end))

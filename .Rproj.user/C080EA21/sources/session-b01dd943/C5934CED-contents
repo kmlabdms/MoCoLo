@@ -1,0 +1,262 @@
+# Figure S1-Table S2
+# The distribution for the expected and the observed
+# Description: Red grey line
+
+library(tidyverse)
+library(ggridges)
+library(patchwork)
+library(scales)
+pinks <- c("#FF2F92", "#FBC6E6")
+greens <- c("#4FAD5B", "#B6E0B4")
+blues <- c("#0096FF", "#8BDBFF")
+
+
+
+# Read 8oxoG Numbers ----
+oxoG <- readRDS("data/first_case/oxoG/simuG_listed_by_permutation_50027x100.rds")
+# Read non-b Numbers ----
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Read MoCoLo results ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+folder <- "v3"
+folder_path <- sprintf("output/%s", folder)
+hypo = "oxo_in_nb"
+hypo = "nb_in_oxo"
+
+result_path <- switch (
+  hypo,
+  "oxo_in_nb" = sprintf("output/%s/mapping_oxi_All.tsv", folder),
+  "nb_in_oxo" = sprintf("output/%s/mapping_oxi_All_simuNB.tsv", folder)
+)
+map_shuffle_tbl <- read_tsv(result_path)
+map_raw <- map_shuffle_tbl %>%
+  mutate(group = ifelse(group == "oxidative", "observed", "expected")) %>%
+  mutate(motif_type = factor(motif_type, levels = str_sort(unique(motif_type)))) %>%
+  arrange(motif_type) %>% select(-ho_rate)
+message(sprintf("Simulatio time: %02d", nrow(map_raw)/7-1))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Part 1: Distribution plot  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+if (hypo == "oxo_in_nb") {
+  sig_8oxoG <- PlotVlineBatch(all_nonB = map_raw, metric = "total_overlapped_region",
+                              ncol = 2, gtitle = "H01: Number of 8-oxo-dG motifs in non-B ")
+} else if (hypo == "nb_in_oxo") {
+  sig_nonB <- PlotVlineBatch(all_nonB = map_raw, metric = "total_overlapped_motif",
+                             ncol = 2, gtitle = "H02: Number of non-B motifs in 8-oxo-dG")
+}
+
+sig_8oxoG | sig_nonB
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Summary table  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mapping <- map_raw %>%
+  left_join(total_nonb) %>%
+  dplyr::rename(
+    colo_nonB = total_overlapped_motif,
+    colo_8oxoG = total_overlapped_region
+  ) %>%
+  mutate(motif_type = str_replace_all(motif_type, "_", " ") %>% str_wrap(10))
+# 4 Get P-value----
+pvalue_dt <- CalcPvalueTable_noEmbed(map_raw)
+pvalue_long <- pvalue_dt %>%
+  purrr::set_names(c("motif_type", "8oxoG", "nonB")) %>%
+  gather(group, pvalue, - motif_type)
+
+# output summary table
+mapping_summary <- map_raw %>%
+  group_by(motif_type, group) %>%
+  summarise(
+    mean_colo_nonB = mean(total_overlapped_motif),
+    mean_colo_8oxoG = mean(total_overlapped_region)
+  ) %>%
+  gather("metrics", "value", -motif_type, -group) %>%
+  spread(group, value) %>%
+  arrange(metrics) %>%
+  mutate(group = str_remove(metrics, "mean_colo_")) %>%
+  # attach more info
+  left_join(total_nonb) %>%
+  left_join(pvalue_long)
+if (F) writexl::write_xlsx(mapping_summary, sprintf("%s/mapping_summary.xlsx", folder_path))
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Part 2: barplot for oxidative group ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mapping_oxidative <-
+  mapping %>% filter(group == "observed") %>%
+  mutate(total_8oxoG = nrow(oxoG[[1]]))
+data_8oxoG <- mapping_oxidative %>% select(motif_type, colo_8oxoG, total_8oxoG) %>%
+  mutate(percent_8oxoG = colo_8oxoG/total_8oxoG, base_percent = 1)
+
+
+
+p_8oxoG_percent <- ggplot(data_8oxoG, aes(motif_type, y = base_percent, fill = motif_type)) +
+  theme_linedraw()+
+  geom_bar(stat = "identity", position = 'identity',   color = "black", alpha=0.3)+
+  geom_bar(aes(motif_type, percent_8oxoG), stat = "identity",  color = "black")+
+  geom_text(aes(y = percent_8oxoG,
+                label = sprintf("%s",percent(percent_8oxoG))),
+            vjust =-0.5, size = 4)+
+  scale_y_continuous(labels = scales::percent)+
+  labs(x = "", title = "Number of 8-oxoG",
+       y = "Percentage") +
+  theme(legend.position = "none",
+        axis.title.y = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.x = element_blank())
+p_8oxoG_percent
+
+
+
+
+
+p_8oxoG_abs <- ggplot(data_8oxoG, aes(motif_type, y = total_8oxoG, fill = motif_type)) +
+  theme_linedraw()+
+  geom_bar(stat = "identity", position = 'identity',   color = "black", alpha=0.3)+
+  geom_bar(aes(motif_type, colo_8oxoG), stat = "identity",  color = "black")+
+  geom_text(aes(y = colo_8oxoG,
+                label = sprintf("%s",percent(percent_8oxoG))),
+            vjust =-0.5, size = 4)+
+  labs(x = "", y = "Number of 8-oxoG",
+       title = "8-oxoG") +
+  #scale_y_log10() +
+  theme(legend.position = "none",
+        axis.title.y = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.x = element_blank())
+p_8oxoG_abs
+
+
+
+
+
+#uniformed
+data_nonb <- mapping_oxidative %>% select(motif_type, colo_nonB, total_nonB) %>%
+  mutate(percent_nonb = colo_nonB/total_nonB, base_percent = 1)
+p_nonB_percent <- ggplot(data_nonb, aes(motif_type, y = base_percent, fill = motif_type)) +
+  theme_linedraw()+
+  geom_bar(stat = "identity", position = 'identity',  color = "black", alpha=0.3)+
+  geom_bar(aes(motif_type, percent_nonb), stat = "identity", color = "black")+
+  geom_text(aes(y = percent_nonb, label = sprintf("%s",percent(percent_nonb, 0.01))), vjust =-0.3)+
+  #geom_text(aes(y = base_percent, label = sprintf("(%i)", total_nonB)), vjust =1.5, size = 3)+
+  scale_y_continuous(labels = scales::percent)+
+  labs(x = "", y = "Percentage",
+       title = "Number of Non-B") +
+  #facet_wrap("motif_type", nrow =1, scales = "free_x")+
+  theme(legend.position = "none",
+        axis.title.y = element_text(size = 12),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+  )
+p_nonB_percent
+
+
+
+# raw counts
+data_nonb_abs <- mapping_oxidative %>% select(motif_type, colo_nonB, total_nonB) %>%
+  mutate(across(where(is.numeric), list(log2=log2, log10=log10), .names = "{.col}_{.fn}" ))
+p_nonB_abs <- ggplot(data_nonb_abs, aes(motif_type, y = total_nonB, fill = motif_type)) +
+  theme_linedraw()+
+  geom_bar(stat = "identity", position = 'identity',   color = "black", alpha=0.3)+
+  geom_bar(aes(motif_type, colo_nonB), stat = "identity", color = "black")+
+  geom_text(aes(y = colo_nonB,
+                label = scales::percent(colo_nonB/total_nonB,accuracy = 0.01)),
+            vjust = -0.3, size=4)+
+  labs(x = "", y = "Number of Non-B",
+       title = "Non-B") +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x)))+
+  annotation_logticks(side ="l")+
+  theme(legend.position = "none",
+        axis.title.y = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.x = element_blank())
+p_nonB_abs
+
+
+# put together
+p1 <- p_8oxoG_abs / sig_8oxoG +  plot_layout(heights = c(1, 1))
+p2 <- p_nonB_abs / sig_nonB +  plot_layout(heights = c(1, 1))
+p3 <- p_8oxoG_percent / sig_8oxoG +  plot_layout(heights = c(1, 1))
+p4 <-  p_nonB_percent / sig_nonB +  plot_layout(heights = c(1, 1))
+
+
+pdf(sprintf("%s/final_visual.pdf", folder_path), width = 6, height = 8)
+p1; p2; p3;p4
+dev.off()
+
+
+
+# Part3: Chr Pvalue dotplot ----
+
+paths <- list.files(sprintf("output/%s/bychr", folder),
+                    pattern = "mapping_oxi_pvalue_CHR_*", full.names = T)
+pvalue_list <- lapply(paths, vroom) %>%
+  set_names(paths %>% str_remove(".tsv") %>%
+              str_remove(sprintf("output/%s/bychr/mapping_oxi_pvalue_CHR_", folder)))
+pvalue_tbl <- pvalue_list %>% bind_rows(.id = "chr") %>%
+  mutate(chr = factor(chr, levels = str_sort(unique(chr), numeric = TRUE))) %>%
+  mutate(nonb_type = str_replace_all(nonb_type, "_", " ")) %>%
+  arrange(chr)
+
+DotPlotPvalue <- function(pvalue_tbl, colname){
+  dat <- pvalue_tbl %>% select(chr, nonb_type, pvalue  = colname) %>%
+    mutate(chr = factor(chr, levels = str_sort(unique(chr), numeric = T) %>% rev())) %>%
+    mutate(nonb_type = factor(nonb_type, levels= unique(nonb_type)))
+
+
+  dat_sig <- dat %>% filter(pvalue <= 0.05)  %>%
+    mutate(nonb_type = factor(nonb_type, levels= unique(dat$nonb_type)))
+
+  dat_sig  <- dat %>% mutate(group = ifelse(pvalue <= 0.05, "sig", "no_sig"))
+
+
+  p <- dat_sig %>%
+    ggplot(aes(x= nonb_type, y= chr, color = nonb_type
+    ))+
+    theme_minimal() +
+    #geom_point(data = dat_sig, aes(color = nonb_type), size = 3)+
+    geom_point(aes(color = nonb_type, shape = group), size = 3)+
+    scale_shape_manual(values = c(NA, 19))+
+    geom_point(color = "black", size = 5, alpha = 0.5, shape=1) +
+    theme(#axis.text.x = element_text(angle = 45, vjust =1, hjust =1),
+      axis.text.x = element_blank(),
+      axis.text.y = element_text(size = 10, face = "italic", color = 'black'),
+      axis.title = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+    )+
+    ggtitle(switch (colname,
+                    "pvalue_oxidative" = "Significance\n(8-oxoG)",
+                    "pvalue_motif" = "Significance\n(Non-B)",
+    ))
+
+  return(p)
+
+}
+psig1 <- DotPlotPvalue(pvalue_tbl, "pvalue_oxidative")
+psig2 <- DotPlotPvalue(pvalue_tbl, "pvalue_motif")
+
+psigs <-
+  (psig1|psig2) +
+  plot_layout(guides = "collect")
+pdf(sprintf("%s/final_psigs.pdf", folder_path), width = 6, height = 6)
+psigs
+dev.off()
+
+
+
+
+

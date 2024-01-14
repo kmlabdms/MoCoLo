@@ -1,0 +1,27 @@
+{
+    "id": "1473A5BA",
+    "path": "~/CCG/QX/Github/MoCoLo/script/case2_1-simulation.R",
+    "project_path": "script/case2_1-simulation.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1702236644740.0,
+    "source_on_save": false,
+    "relative_order": 5,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "58,24",
+        "scrollLine": "0",
+        "docOutlineVisible": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1702248401,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1702248401826,
+    "read_only": false,
+    "read_only_alternatives": []
+}

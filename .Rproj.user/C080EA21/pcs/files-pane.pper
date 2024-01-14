@@ -1,0 +1,17 @@
+{
+    "sortOrder": [
+        {
+            "columnIndex": 2,
+            "ascending": true
+        },
+        {
+            "columnIndex": 4,
+            "ascending": true
+        },
+        {
+            "columnIndex": 3,
+            "ascending": false
+        }
+    ],
+    "path": "~/CCG/QX/Github"
+}

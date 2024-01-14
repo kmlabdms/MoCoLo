@@ -1,0 +1,27 @@
+# Sample Size
+N           <- 2^12;
+# Linear Model to Boostrap          
+Model2Boot  <- lm( mpg ~ wt + disp, mtcars)
+# Values of the model coefficients
+Betas       <- coefficients(Model2Boot)
+# Number of coefficents to test against
+M           <- length(Betas)
+# Matrix of M columns to hold Bootstraping results
+BtStrpRes   <- matrix( rep(0,M*N), ncol=M)
+
+for (i in 1:N) {
+  # Simulate data N times from the model we assume be true
+  # and save the resulting coefficient in the i-th row of BtStrpRes
+  BtStrpRes[i,] <-coefficients(lm(unlist(simulate(Model2Boot)) ~wt + disp, mtcars))
+}
+
+#Get the p-values for coefficient
+P_val1 <-mean( abs(BtStrpRes[,1] - mean(BtStrpRes[,1]) )> abs( Betas[1]))
+P_val2 <-mean( abs(BtStrpRes[,2] - mean(BtStrpRes[,2]) )> abs( Betas[2]))
+P_val3 <-mean( abs(BtStrpRes[,3] - mean(BtStrpRes[,3]) )> abs( Betas[3]))
+
+#and some parametric bootstrap confidence intervals (2.5%, 97.5%) 
+ConfInt1 <- quantile(BtStrpRes[,1], c(.025, 0.975))
+ConfInt2 <- quantile(BtStrpRes[,2], c(.025, 0.975))
+ConfInt3 <- quantile(BtStrpRes[,3], c(.025, 0.975))
+

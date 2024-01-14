@@ -1,0 +1,31 @@
+library(ggpubr)
+TG=nonB.counts.all%>%gather("nonB_type","peaks",-group)%>%
+  filter(nonB_type=="G_Quadruplex_Motif")
+stat.test<-compare_means(peaks ~ group, data = TG,group.by="nonB_type")
+
+bxp <- ggplot(TG, aes(x=nonB_type, y=peaks, 
+                        color=nonB_type, 
+                        shape=group,size=group)) + 
+  geom_jitter(position=position_jitter(0.2)) +
+  stat_compare_means()+
+  # stat_summary(fun.data=mean_sdl, mult=1, 
+  #              geom="pointrange", color="red")+
+  scale_color_brewer(palette="Dark2")+
+  # Change point shapes manually
+  scale_shape_manual(values=c(11,19))+
+  scale_size_manual(values=c(5,2)) +
+  theme_linedraw()+
+  facet_wrap(~nonB_type,scales='free_x',nrow = 1)+
+  labs(title="Number of G4-containing 8-oxodG or randomly positioned peak in genome",
+       x="experimental sample vs random samples", 
+       y = "Number of 8-oxodG peaks containing non-B motif")
+
+library(ggpubr)
+library(rstatix)
+# Statistical test
+stat.test <- TG %>%
+  group_by(nonB_type) %>%
+  wilcox_test(peaks ~ group) %>%
+  adjust_pvalue() %>%
+  add_significance("p.adj")
+stat.test

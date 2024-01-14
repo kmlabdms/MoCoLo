@@ -1,0 +1,28 @@
+{
+    "id": "4B142E22",
+    "path": "/stor/work/CancerClinicalGenomics/QX/Github/MoCoLo/script/case2_2-coLocalization.R",
+    "project_path": "script/case2_2-coLocalization.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1694115891419.0,
+    "source_on_save": false,
+    "relative_order": 6,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "docOutlineVisible": "1",
+        "cursorPosition": "105,33",
+        "scrollLine": "0",
+        "docOutlineSize": "289"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1695392430,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1695392430944,
+    "read_only": false,
+    "read_only_alternatives": []
+}

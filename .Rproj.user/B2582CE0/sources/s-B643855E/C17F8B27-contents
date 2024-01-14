@@ -1,0 +1,20 @@
+library(readr)
+library(tidyverse)
+MCF10A.0 <- read_delim("data/GSE100234_DIP_8oxodG_peaks_MCF10A.bed", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+MCF10A <- MCF10A.0%>%filter(`-log10(pvalue)`>5, fold_enrichment>7)
+
+library(readr)
+G0 <- read_delim("GSE137929_8oxodG_peaks_G0-arrested_MCF10A.bed",
+               "\t",escape_double = FALSE, trim_ws = TRUE)
+
+# read 8-oxodG
+MCF10A%>%count(chr)%>%print(n=23)
+G0%>%count(chr)%>%print(n=23)
+
+
+# read non-B hg19
+path="data/g-quadruplex_forming_repeats_hg19/tsv/"
+temp <- list.files(path,pattern = "*.tsv",full.names = T)%>%
+  map_df(~read_delim(.,"\t", escape_double = FALSE, trim_ws = TRUE))
+nonB.bed <- temp%>%select(Sequence_name,Start,Stop,Type)

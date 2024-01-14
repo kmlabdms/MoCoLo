@@ -1,0 +1,143 @@
+library(tidyverse)
+library(tictoc)
+library(BSgenome.Hsapiens.UCSC.hg19)
+options(bedtools.path = "/opt/homebrew/bin/")
+library(valr)
+library(here)
+devtools::load_all()
+
+setwd("/stor/work/CancerClinicalGenomics/QX/Github/MoCoLo")
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 2 Non-B simulation -----
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## The observed
+all_nonb_property
+
+
+
+
+# ~~~~~~~~~~~~~~~~~~~~
+## Simulation nonb ----
+# ~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~
+### not restrict G% ----
+# ~~~~~~~~~~~~~~~~~~~~
+if(F) {
+  nonb_simu <- SimuPosistion(all_nonb_property[1:4], hg19.size, 100, add_ng = F)
+  saveRDS(nonb_simu,"data/first_case/nonb_simu_length_all.rds")
+}
+
+# ~~~~~~~~~~~~~~~~~~~~
+### restrict G% ----
+# ~~~~~~~~~~~~~~~~~~~~
+nonb_name_sorted = sapply(nonbDB, \(x){nrow(x)}) %>% sort() %>% names()
+
+tictoc::tic()
+for (nonb_name in nonb_name_sorted) {
+  message(nonb_name)
+  region_real = all_nonb_property %>%
+    filter(Type == nonb_name) %>%
+    identity() %>%
+    dplyr::rename(nG = real_nG, pG = real_pG)
+
+  tic()
+  region_real_simu <-
+    SimulateRegions(
+      region_real = region_real,
+      simu_fuc = SimulatePool,
+      # number of simulation
+      n_test = 100,
+      cores = 72,
+      # parameters in SimulatePool()
+      # TODO: start tolerance should be high to short sequences such as non-B
+      # It will probably also be better to use real count when the tolerance is small
+      tolerence = 0.1,
+      increase_tol_after = 1,
+      permutation = 1e+04,
+      increase_tol_step = 0.05,
+      within_chr = T
+    )
+  saveRDS(region_real_simu,
+          sprintf(
+            here::here("data/first_case/nonb_chr_simuG_%s.rds"),
+            nonb_name
+          ))
+  toc()
+}
+tictoc::toc()
+
+
+# QC: check the simulation result
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Test the hyperparameter
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+plot_saver = list()
+for (nonb_name in "Z_DNA_Motif") {
+  message(nonb_name)
+  region_real = all_nonb_property %>%
+    filter(Type == nonb_name) %>%
+    identity() %>%
+    dplyr::rename(nG = real_nG, pG = real_pG) %>%
+    head(50)
+
+  region_real = oxog_real[sample(1000), ]
+
+  start = 0.10
+  step = 0.1
+
+  tic()
+  region_real_simu <-
+    SimulateRegions(
+      region_real = region_real,
+      simu_fuc = SimulatePool,
+      # number of simulation
+      n_test = 2,
+      cores = 1,
+      tolerence = start,
+      increase_tol_after = 1,
+      permutation = 1e+03,
+      increase_tol_step = step,
+      within_chr = T
+    )
+  saveRDS(region_real_simu,
+          sprintf(
+            here::here("data/first_case/nonb_hyperparameter_simuG_%s_%s(%s).rds"),
+            nonb_name, start, step
+          ))
+  toc()
+}
+tictoc::toc()
+
+if (T) {
+  start = 0.01
+  step = 0.01
+  zpath = sprintf(
+    here::here("data/first_case/nonb_hyperparameter_simuG_%s_%s(%s).rds"),
+    nonb_name, start, step
+  )
+  simu_check = read_rds(zpath)
+  thename = sprintf("simuG_%s_%s", start, step)
+  if (start != 1) {
+    plot_title = sprintf("Start(%.0f%%), Step(%.0f%%)", start*100, step*100)
+  } else {
+    plot_title = "No G% restriction"
+  }
+  plot_saver[[thename]] = simu_check[[2]] %>%
+    mutate(real_pg = real_ng / length) %>%
+    select(peak_id, expected = simu_pg, observed = real_pg) %>%
+    gather("Group", "gcontent", -peak_id) %>%
+    ggplot(aes(x = gcontent, color = Group)) +
+    geom_density(size = 1) +
+    scale_color_manual(values = c("blue", "red")) +
+    scale_x_continuous(labels = scales::percent, limits = c(0,1)) +
+    theme(axis.title = element_text(face = "bold")) +
+    labs(x = "G%", title = plot_title)
+}
+
+library(patchwork)
+(plot_saver$simuG_1_0.1+plot_saver$simuG_0.1_0.1) /
+  (plot_saver$simuG_0.1_0.01 + plot_saver$simuG_0.01_0.01)
+
+
+
+

@@ -1,0 +1,98 @@
+library(tidyverse)
+library(ggpubr)
+
+# Test One
+# Are there more non-Bs in 8-oxoG than non-8-oxoG regions? 
+# Comparision: (8-oxoG vs random)
+# for each NonB
+result_path <- sprintf("output/v3/mapping_oxi_All.tsv")
+map_raw <- read_tsv(result_path) %>%
+  mutate(group = ifelse(group == "oxidative", "MCF10A", "Random")) %>%
+  mutate(motif_type = factor(motif_type, levels = str_sort(unique(motif_type)))) %>%
+  arrange(motif_type) %>% select(-ho_rate)
+oxog_test1 <- map_raw %>% 
+  select(motif_type, count = total_overlapped_region, group ) %>% 
+  mutate(pct = round( count / 50027, 3)) %>%
+  mutate(
+    motif_type = recode(
+      motif_type,
+      A_Phased_Repeat = "APR",
+      Direct_Repeat = "DR",
+      G_Quadruplex_Motif = "G4",
+      Inverted_Repeat = "IR",
+      Mirror_Repeat = "MR",
+      Short_Tandem_Repeat = "STR",
+      Z_DNA_Motif = "ZDNA"))  %>%  mutate(motif_type = sprintf("8-oxo-G\nwith %s", motif_type))
+
+p <- ggbarplot(oxog_test1, x = "group", y = "pct", 
+          facet.by = "motif_type", scale = "free_x", nrow =2,
+          add = c("jitter", "mean_se"),  
+          add.params = list(shape = 1, size = 1),
+          color = "group",  fill = "group", alpha=0.5,
+          palette = c("red", "grey50"),
+          label = T, lab.pos = "out", lab.col = "black", lab.nb.digits = 2,
+          position = position_dodge(0.8)) +
+  scale_y_continuous(labels = scales::percent)+
+  theme_linedraw()  + rremove("x.grid")  
+
+p + stat_pvalue_manual(stat_test, label = "p.format")
+
+
+stat_test <- 
+  compare_means(pct ~ group, data = oxog_test1, group.by = "motif_type") %>%
+  mutate(y.position = 0.8)
+
+
+stat.test <- compare_means(
+  len ~ dose, data = ToothGrowth,
+  method = "t.test"
+)
+stat.test
+stat.test <- stat.test %>%
+  mutate(y.position = c(29, 35, 39))
+p + stat_pvalue_manual(stat.test, label = "p.adj")
+
+
+
+
+
+
+
+
+
+
+# Test Two
+# Are there more 8-oxoG region overalpped one type of non-Bs than another?
+# Comparesion: (paired non-B)
+map_sum <- readxl::read_excel("output/v3/mapping_summary.xlsx") 
+oxog <- map_sum %>% filter(metrics == "mean_colo_8oxoG") %>%
+  mutate(total_oxog = 50027) %>%
+  mutate(pct_obs = observed / total_oxog,
+         pct_exp = expected / total_oxog,
+  ) %>% arrange(desc(pct_obs)) %>%
+  mutate(motif_type = fct_reorder(motif_type, pct_obs, .desc = T))
+
+
+
+
+file_paths <- list.files("output/pct_diff", full.names = TRUE)
+file_names <- str_remove(file_paths, "output/pct_diff/") %>% str_remove(".png") %>% 
+  str_replace(" - ", "__")
+tbls <- lapply(file_paths, read_tsv) %>% set_names(file_names) 
+diff <- tbls %>% bind_rows(.id = "comparison") %>%  
+  separate("comparison", c("motif_A", "motif_B"), sep = "__", remove = FALSE) %>%
+  mutate(across(where(is.numeric), abs))
+diff_list <- diff %>% split(.$comparison)
+
+mr = diff_list[[8]]
+CalP <-  function(mr, metric="pct_oxog_diff") {
+  z <-  mr %>% split(.$group) %>% lapply(pull, metric)
+  z0=z[["expected"]]
+  z1=z[["observed"]]
+  p_value <- mean(z0 > z1)
+  return(p_value)
+}
+sapply(diff_list, CalP, metric="pct_oxog_diff")
+sapply(diff_list, CalP, metric="pct_nonb_diff")
+
+

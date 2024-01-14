@@ -1,0 +1,144 @@
+library(tidyverse)
+library(ggpubr)
+
+# Test One
+# Are there more non-Bs in 8-oxoG than non-8-oxoG regions? 
+# Comparision: (8-oxoG vs random)
+# for each NonB
+result_path <- sprintf("output/v3/mapping_oxi_All.tsv")
+map_raw <- read_tsv(result_path) %>%
+  mutate(group = ifelse(group == "oxidative", "MCF10A", "Random")) %>%
+  mutate(motif_type = factor(motif_type, levels = str_sort(unique(motif_type)))) %>%
+  arrange(motif_type) %>% select(-ho_rate) %>%
+  mutate(
+    motif_short = recode(
+      motif_type,
+      A_Phased_Repeat = "APR",
+      Direct_Repeat = "DR",
+      G_Quadruplex_Motif = "G4",
+      Inverted_Repeat = "IR",
+      Mirror_Repeat = "MR",
+      Short_Tandem_Repeat = "STR",
+      Z_DNA_Motif = "ZDNA"))  
+# metric1
+oxog_test1 <- map_raw %>% 
+  select(motif_type, count = total_overlapped_region, group, motif_short) %>% 
+  mutate(pct = round( count / 50027, 3)) %>%
+  mutate(motif_wrap = sprintf("8-oxo-G\nwith %s", motif_short))
+# metric2
+oxog_test1 <- map_raw %>% 
+  select(motif_type, count = total_overlapped_motif, group, motif_short) %>% 
+  left_join(total_nonb) %>%
+  mutate(pct = round( count / total_nonB, 3)) %>%
+  mutate(motif_wrap = sprintf("%s\nin 8-oxo-G", motif_short))
+
+# mean value
+pct_mean <- oxog_test1 %>% group_by(motif_wrap, group) %>% dplyr::summarise(pct = mean(pct))
+# p value
+stat_test <- compare_means(
+  pct ~ group, data = oxog_test1, group.by = "motif_wrap"
+) %>% mutate(y.position = 0.9)
+# metric1 
+stat_test$monte_carlo <- c("***", "***", "***", "ns", "***", "***", "ns")
+# metric2 
+stat_test <- stat_test %>% mutate(y.position = 0.09)
+stat_test$monte_carlo <- c("***", "***", "*", "ns", "***", "***", "***")
+
+
+
+p <- ggplot(pct_mean, aes(group, pct)) +
+  geom_bar(stat = "identity",
+           aes(fill = group, color = group), alpha = 0.5) +
+  geom_jitter(data=oxog_test1, aes(color = group), size = 2, alpha = 0.5) +
+  facet_wrap("motif_wrap", nrow = 1, scale = "free_x") +
+  geom_text(aes(label = scales::percent(pct, accuracy = 0.1)), vjust = -1, fontface = "bold.italic", size = 3.5)
+final_p <-
+  p + 
+  theme_linedraw() + 
+  rremove("x.grid")+ 
+  theme(
+    axis.text = element_text(size = 10,  face = "bold"), 
+    strip.background = element_rect(fill = "white", colour = "black"), 
+    strip.text = element_text(size = 12, face = "bold", colour = "black"),
+  )+
+  theme(panel.spacing = unit(1, "lines")) +
+  ggpubr::rotate_x_text(0)
+# metric1
+final_p + 
+  scale_y_continuous(labels = scales::percent, limits = c(0,1)) +
+  stat_pvalue_manual(stat_test, label = "monte_carlo", label.size = 4) +
+  scale_fill_manual(values = c("red", "grey50")) +
+  scale_color_manual(values = c("red", "grey50")) +
+  labs(title = "Overalapped 8-oxoG regions", subtitle = "Comparision: (Sequencing vs Simulation)",
+       y = "8-oxoG regions \n(Overlapped / Total)", x= "" )
+# metric2
+final_p + 
+  scale_y_continuous(labels = scales::percent, limits = c(0,0.1)) +
+  stat_pvalue_manual(stat_test, label = "monte_carlo", label.size = 4) +
+  scale_fill_manual(values = c("dodgerblue", "grey50")) +
+  scale_color_manual(values = c("dodgerblue", "grey50")) +
+  labs(title = "Overalapped non-B motifs", subtitle = "Comparision: (Sequencing vs Simulation)",
+       y = "Non-B motifs\n(Overlapped / Total)", x= ""  )
+
+
+
+# Test Two
+# Are there more 8-oxoG region overalpped one type of non-Bs than another?
+# Comparesion: (paired non-B)
+map_sum <- readxl::read_excel("output/v3/mapping_summary.xlsx") 
+total_nonb <-  map_sum %>% distinct(motif_type, total_nonB)
+oxog <- map_sum %>% filter(metrics == "mean_colo_8oxoG") %>%
+  mutate(total_oxog = 50027) %>%
+  mutate(pct_obs = observed / total_oxog,
+         pct_exp = expected / total_oxog,
+  ) %>% 
+  mutate(motif_type = fct_reorder(motif_type, pct_obs, .desc = T))
+oxog_p <- oxog %>% select(motif_type, pvalue)
+
+
+
+file_paths <- list.files("output/pct_diff", full.names = TRUE)
+file_names <- str_remove(file_paths, "output/pct_diff/") %>% str_remove(".png") %>% 
+  str_replace(" - ", "__")
+tbls <- lapply(file_paths, read_tsv) %>% set_names(file_names) 
+diff <- tbls %>% bind_rows(.id = "comparison") %>%  
+  separate("comparison", c("motif_A", "motif_B"), sep = "__", remove = FALSE) %>%
+  mutate(across(where(is.numeric), abs))
+diff_list <- diff %>% split(.$comparison)
+
+
+
+
+# CALCULATE P-VALUE 
+mr = diff_list[[8]]
+CalP <-  function(mr, metric="pct_oxog_diff") {
+  z <-  mr %>% split(.$group) %>% lapply(pull, metric)
+  z0=z[["expected"]]
+  z1=z[["observed"]]
+  p_value <- mean(z0 > z1)
+  return(p_value)
+}
+diff_p_oxog <- sapply(diff_list, CalP, metric="pct_oxog_diff") %>% 
+  tibble(comparison = names(.), pvalue_oxog = .)
+#sapply(diff_list, CalP, metric="pct_nonb_diff")
+diff_p_nonB <- sapply(diff_list, CalP, metric="pct_nonb_diff") %>% 
+  tibble(comparison = names(.), pvlaue_nonb = .)
+
+diff_all <- diff %>%  left_join(diff_p_oxog) %>%  left_join(diff_p_nonB)
+diff_obs <- diff_all %>% filter(group == "observed")
+
+
+GetCorrTbl <- function (tbl, metric) {
+  tbl %>% select(motif_A, motif_B, value = metric) %>% 
+    spread(motif_B, value) %>% 
+    column_to_rownames("motif_A") %>% 
+    t()
+}
+
+diff <- GetCorrTbl(diff_obs, "pct_oxog_diff")
+p <- GetCorrTbl(diff_obs, "pvalue_oxog")
+ggcorrplot::ggcorrplot(diff, p.mat = p, lab = TRUE, insig = "blank",
+                       type = "lower",
+                        outline.color = "black")
+
+

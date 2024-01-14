@@ -1,0 +1,321 @@
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Colocalization Testing ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+# input for running  ----
+folder <- "v3"
+path_folder = sprintf("output/%s/bychr", folder)
+if (!dir.exists(path_folder)) {
+  dir.create(sprintf("output/%s/bychr", folder), recursive = TRUE)
+}
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 0 data preparation ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 8oxoG
+# oxidative_all <- readRDS("data/first_case/oxoG/simuG_listed_by_permutation_50027x100.rds")
+oxidative_all <- readRDS("data/first_case/oxog_chr_simuG.rds")
+# oxidative_all = c(oxidative_all[1], region_real_simu_noG)
+oxog_real_list = list(oxog = oxidative_all[[1]])
+
+# NB
+nonbDB
+if(F) {
+nonb_simu <- SimuPosistion(all_nonb_property[1:4], hg19.size, 100, add_ng = F)
+nonb_real_simu_list =
+  lapply(names(nonbDB),
+         \(nonb_type) {
+           c(list(nonbDB[[nonb_type]]),
+             map(nonb_simu, ~ filter(.x, group == nonb_type)))
+         })
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 1 Colocal: Simulation 8-oxoG (Not by chr) ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+oxidative_all <- readRDS("data/first_case/oxoG/simuG_listed_by_permutation_50027x100.rds")
+## 1.1 Running the mapping ----
+map_shuffle_tbl <- MapGenomewide(
+  feature_simulation = oxidative_all,
+  feature_condition_list = nonbDB,
+  n_core = 36
+)
+## 1.2 Get P-value ----
+pvalue_dt <- CalcPvalueTable(map_shuffle_tbl)
+## 1.3 Save output ----
+if (F) {
+  write_tsv(map_shuffle_tbl, sprintf("output/%s/mapping_oxi_All.tsv", folder))
+  write_csv(pvalue_dt, sprintf("output/%s/mapping_oxi_pvalue_All.csv", folder))
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 2 Colocal: Simulation 8-oxoG (by chr) ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+oxidative_all <- readRDS("data/first_case/oxog_chr_simuG.rds")
+## 1.1 Running the mapping ----
+map_shuffle_tbl <- MapGenomewide(
+  feature_simulation = oxidative_all[1:10],
+  feature_condition_list = nonbDB,
+  n_core = 36L
+)
+## 1.2 Get P-value ----
+pvalue_dt <- CalcPvalueTable(map_shuffle_tbl)
+## 1.3 Save output ----
+if (T) {
+  write_tsv(map_shuffle_tbl, sprintf("output/%s/mapping_oxi_All_oxogchr.tsv", folder))
+  write_csv(pvalue_dt, sprintf("output/%s/mapping_oxi_pvalue_All_oxogchr.csv", folder))
+}
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 3 Colocal: Simulation NonB (Not by Chr) ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## 1.1 Running the mapping ----
+
+#### single nonb
+map_shuffle_tbl <- MapGenomewide(
+  feature_simulation = nonb_real_simu_list[[7]],
+  feature_condition_list = oxog_real_list,
+  n_core = 36L
+)
+
+#### seven nonb
+map_shuffle_tbl <-
+  map(
+    nonb_real_simu_list,
+    ~MapGenomewide(
+      feature_simulation = .x,
+      feature_condition_list = oxog_real_list,
+      n_core = 36L
+    )
+  )
+map_shuffle_tbl_nonb =
+  map_shuffle_tbl %>%
+  set_names(names(nonbDB)) %>%
+  map(~select(.x, -motif_type)) %>%
+  bind_rows(.id = "motif_type")
+
+
+## 1.2 Get P-value ----
+pvalue_dt_nonb <- CalcPvalueTable(map_shuffle_tbl_nonb)
+## 1.3 Save output ----
+if (F) {
+  write_tsv(map_shuffle_tbl_nonb, sprintf("output/%s/mapping_oxi_All_simuNB.tsv", folder))
+  write_csv(pvalue_dt_nonb, sprintf("output/%s/mapping_oxi_pvalue_All_simuNB.csv", folder))
+}
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 2 Colocal: Simulation NonB (G% and by Chr) ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+nonb_simu = read_rds("data/first_case/nonb_chr_simuG_Z_DNA_Motif.rds")
+nonb_simuG_list =
+  list.files("data/first_case/",
+             pattern = "nonb_chr_simuG",
+             full.names = T) %>%
+  map(~read_rds(.x))
+## 1.1 Running the mapping ----
+#### single nonb
+map_shuffle_tbl <- MapGenomewide(
+  feature_simulation = nonb_simuG_list[[1]],
+  feature_condition_list = oxog_real_list,
+  n_core = 36L
+)
+
+zdna = nonb_simuG_list[[6]]
+
+inner_join(zdna[[1]], zdna[[2]], by = join_by(chrom, length, nG==real_ng),
+           relationship = "one-to-one")
+
+#### seven nonb
+map_shuffle_tbl <-
+  map(
+    nonb_simuG_list,
+    ~MapGenomewide(
+      feature_simulation = .x,
+      feature_condition_list = oxog_real_list,
+      n_core = 36L
+    )
+  )
+names_nb = unlist(map(nonb_simuG_list,~unique(.x[[1]][["Type"]])) )
+map_shuffle_tbl_nonb =
+  map_shuffle_tbl %>%
+  set_names(names_nb) %>%
+  map(~select(.x, -motif_type)) %>%
+  bind_rows(.id = "motif_type")
+
+
+## 1.2 Get P-value ----
+pvalue_dt_nonb <- CalcPvalueTable(map_shuffle_tbl_nonb)
+## 1.3 Save output ----
+if (F) {
+  write_tsv(map_shuffle_tbl_nonb, sprintf("output/%s/mapping_oxi_All_simuNBwithG.tsv", folder))
+  write_csv(pvalue_dt_nonb, sprintf("output/%s/mapping_oxi_pvalue_All_simuNBwithG.csv", folder))
+}
+
+
+
+
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# (Old, Optional) Extract non-b sequences that overlapped with 8-oxoG ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+host_feature <- oxidative_all[[1]]
+nest_feature <- nonbDB %>% bind_rows()
+bt_coverage_output <-
+  bed_coverage(nest_feature, host_feature) %>%
+  janitor::clean_names()
+chr = bt_coverage_output$chrom %>% unique() %>% str_sort(numeric=T)
+output <- bt_coverage_output %>%
+  mutate(chrom = factor(chrom, levels = chr)) %>%
+  arrange(chrom, start, end) %>%
+  filter(ints ==1, frac == 1) %>%
+  arrange(desc(frac)) %>%
+  identity() %>%
+  select(1:5)
+
+output_list <- split(output, output$type)
+if (F) writexl::write_xlsx(output_list, "overlapped_nonb_motifs_frac1_v2.xlsx")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# (Old) Colocal with 8oxoG Simulation by CHR (Figure 6) ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+oxidative_chr <- readRDS("data/first_case/oxoG/region_CHR_realG%_simux100.rds")
+# for loop
+for (i in 1:length(oxidative_chr)) {
+  oxidative = oxidative_chr[[i]]
+  chr_name = names(oxidative_chr)[[i]]
+  print(chr_name)
+  print(dim(oxidative[[1]]))
+  map_shuffle_tbl <- MapGenomewide(
+    region_list = oxidative,
+    nonB_list = nonbDB,
+    n_core = 36L
+  )
+
+  ## 1.2 Get P-value ----
+  pvalue_dt <- CalcPvalueTable(map_shuffle_tbl)
+  ## 1.3 Save output ----
+  write_tsv(map_shuffle_tbl, sprintf("output/%s/bychr/mapping_oxi_CHR_%s.tsv", folder, chr_name))
+  write_tsv(pvalue_dt, sprintf("output/%s/bychr/mapping_oxi_pvalue_CHR_%s.tsv", folder, chr_name))
+
+}
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# QC: check 8-oxo-G counts data by chr ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+oxog_real = oxidative_all[[1]] %>% arrange(start)
+oxog_simu = oxidative_all[[2]] %>% arrange(start)
+nonbDB
+
+### 1.3.1 Distribution number of motifs by chromosome ----
+ob = oxog_real %>% count(chrom) %>% mutate(group = "observed")
+ex = oxog_simu %>% count(chrom) %>% mutate(group = "expected")
+# oxog
+bind_rows(ob, ex) %>%
+  ggplot(aes(x = chrom, y = n, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge")
+# nonb
+g4 = nonbDB$G_Quadruplex_Motif %>%  count(chrom) %>% mutate(group = "G4")
+ir = nonbDB$Inverted_Repeat %>%  count(chrom) %>% mutate(group = "ir")
+z = nonbDB$Z_DNA_Motif %>%  count(chrom) %>% mutate(group = "Z")
+purrr::reduce(list(ob, ex, g4, z), bind_rows) %>%
+  mutate(chrom = factor(chrom, levels=str_sort(unique(chrom), numeric = T))) %>%
+  ggplot(aes(x = chrom, y = n, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge")
+
+
+### 1.3.2 Distribution of co-localization ----
+if (T) {
+  # overlapped oxog
+  colocal_real =
+    purrr::map2(nonbDB, list(oxog_real), ~bed_coverage(.y, .x)) %>%
+    map(~filter(.x, .ints > 0))
+} else {
+  # intersection
+  colocal_real =
+    purrr::map2(nonbDB, list(oxog_real), ~bed_intersect(.y, .x))
+}
+## colocal in the gene region
+colocal_real_gene <- colocal_real %>%
+  map(~fuzzyjoin::genome_left_join(.x, biomart37) %>%
+        dplyr::rename(chrom = chrom.x)
+      ) %>%
+  map(~filter(.x, !is.na(hgnc_symbol)))
+region_in_genes = tibble(
+  motif_type = names(colocal_real),
+  overlap_oxog_gene = map_int(colocal_real_gene, ~nrow(.)),
+  overlap_oxog_total = map_int(colocal_real, ~nrow(.))
+)
+ggplot(region_in_genes) +
+  geom_col(aes(x = motif_type, y = overlap_oxog_total), fill = "grey80") +
+  geom_col(aes(x = motif_type, y = overlap_oxog_gene,   fill = motif_type)) +
+  theme(legend.position = "none")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 0, colour = "black"))
+
+
+
+# counting
+# choe
+res_colocal_real =
+  colocal_real %>% # choose "colocal_real" or "colocal_real_gene"
+  # filter non-b types that are not significant
+  bind_rows(.id = "motif_type") %>%
+  filter(!motif_type %in% c("A_Phased_Repeat", "Inverted_Repeat")) %>%
+  mutate(chrom = factor(chrom, levels=str_sort(unique(chrom), numeric = T)))
+n_overlap_type = res_colocal_real %>% count(motif_type, name = "overlap")
+n_overlap = res_colocal_real %>% count(motif_type, chrom, name = "overlap")
+
+## process
+oxog_size = oxog_real %>% count(chrom, name = "oxog_size")
+nonb_size = bind_rows(nonbDB) %>% count(Type, chrom, name = "nonb_size") %>%
+  dplyr::rename(motif_type = Type)
+
+norm_overlap = n_overlap %>% left_join(oxog_size) %>% left_join(nonb_size) %>%
+  mutate(overlap_norm = overlap / oxog_size / nonb_size * 1e+6) %>%
+  mutate(overlap_norm_oxog = overlap / oxog_size * 1e+2) %>%
+  mutate(chrom = factor(chrom, levels=str_sort(unique(chrom), numeric = T)))
+
+norm_overlap %>%
+  filter(!motif_type %in% c("A_Phased_Repeat")) %>%
+  ggplot(aes(x = chrom, y = motif_type,
+             color = motif_type,
+             size = overlap_norm # overlap or overlap norm
+             )) +
+  geom_point() +
+  geom_point(shape = 1, color = "black") +
+  theme(legend.position = "right") +
+  theme(axis.text.x = element_text(angle=45, vjust=0.5))
+
+# using heatmap
+# data is the nomalized overlapped by both nonb size and oxog size
+# then scale to (-2,2)
+norm_mat = norm_overlap %>%
+  select(motif_type, chrom, overlap_norm_oxog) %>%
+  spread(chrom, overlap_norm_oxog, fill = 0) %>%
+  column_to_rownames("motif_type")
+
+mat_visual =t(norm_mat) %>% scale() %>% t() %>% scale()
+ComplexHeatmap::Heatmap(mat_visual, cluster_columns = F, cluster_rows = F,
+                        name = "8-oxo-dG\n(z-score)",
+                        rect_gp = grid::gpar(color ='black'),
+                        col = circlize::colorRamp2(c(-2, 1, 2), c("white","white","red"))
+                        )
+
+

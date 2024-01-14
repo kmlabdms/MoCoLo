@@ -1,0 +1,50 @@
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 8-OXO-DG DATA ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+oxidative_all <-
+  readRDS("data/first_case/oxoG/simuG_listed_by_permutation_50027x100.rds")
+usethis::use_data(oxidative_all)
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# NON-B DATA ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Read non-b Numbers ----
+nonbDB <- readRDS("data/first_case/nonb/nonB_list_v3.rds")
+nonb_sequences <- nonbDB %>% bind_rows(.id = "type")
+
+#  Read Mapping Output ----
+total_nonb <- nonb_sequences %>% count(type) %>%
+  dplyr::rename(total_nonB = n, motif_type = type)
+
+# calculate non-b G percent
+all_nonb = nonbDB %>% bind_rows()
+all_nonb_property = all_nonb %>%
+  mutate(length = nchar(Sequence)) %>%
+  mutate(real_nG = str_count(Sequence, "G")) %>%
+  mutate(real_pG = real_nG / length)
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# hg19 ----
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+hg19.size <-
+  read.delim("data-raw/hg19.size", header=FALSE)[1:24,] %>%
+  set_names(c('chrom', 'size'))
+
+biomart37 = read_rds("data-raw/biomart_table_37.rds") %>%
+  dplyr::rename(chrom = chromosome, gene_length = length) %>%
+  filter(hgnc_symbol != "")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# USETHIS ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# use_data
+usethis::use_data(nonbDB)
+usethis::use_data(total_nonb)
+usethis::use_data(all_nonb_property)
+usethis::use_data(hg19.size)
+usethis::use_data(biomart37)
+

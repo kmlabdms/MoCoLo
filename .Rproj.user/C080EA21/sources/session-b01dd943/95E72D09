@@ -1,0 +1,27 @@
+{
+    "id": "95E72D09",
+    "path": "/stor/work/CancerClinicalGenomics/QX/Github/MoCoLo/script/case2_3-visualization.R",
+    "project_path": "script/case2_3-visualization.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1695392462372.0,
+    "source_on_save": false,
+    "relative_order": 5,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "205,0",
+        "scrollLine": "0",
+        "docOutlineVisible": "0"
+    },
+    "folds": "252|43|289|0|\n",
+    "lastKnownWriteTime": 1696191349,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1696191349925,
+    "read_only": false,
+    "read_only_alternatives": []
+}

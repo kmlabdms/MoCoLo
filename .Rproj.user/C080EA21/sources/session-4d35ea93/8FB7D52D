@@ -1,0 +1,26 @@
+{
+    "id": "8FB7D52D",
+    "path": "~/CCG/QX/Github/MoCoLo/data-raw/process_data_to_rda.R",
+    "project_path": "data-raw/process_data_to_rda.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1702236236813.0,
+    "source_on_save": false,
+    "relative_order": 6,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "18,50",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1702236348,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1702236348689,
+    "read_only": false,
+    "read_only_alternatives": []
+}
